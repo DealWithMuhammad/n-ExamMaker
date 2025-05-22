@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { Providers } from "./providers";
 import { fontSans } from "@/config/fonts";
 import clsx from "clsx";
-import { ToastProvider } from "@/components/toast-provider";
+// import { ToastProvider } from "@/components/toast-provider";
 
 export const metadata: Metadata = {
   title: "ELS ICT EXAM",
@@ -23,7 +23,7 @@ export default function RootLayout({
       <body className={clsx("font-sans antialiased", fontSans.className)}>
         <Providers>
           {children}
-          <ToastProvider />
+          {/* <ToastProvider /> */}
         </Providers>
       </body>
     </html>
