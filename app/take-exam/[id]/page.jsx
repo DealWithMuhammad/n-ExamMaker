@@ -143,7 +143,7 @@ export default function ExamRegistration({ params }) {
         <Card className="max-w-md w-full">
           <CardHeader className="flex flex-col items-center gap-3">
             <div className="flex flex-col items-center">
-              <h1 className="text-2xl font-bold">{exam.title}</h1>
+              <h1 className="text-2xl text-center font-bold">{exam.title}</h1>
               <p className="text-default-500">
                 Please enter your information to begin
               </p>
@@ -161,8 +161,8 @@ export default function ExamRegistration({ params }) {
               />
 
               <Input
-                label="Class/Section"
-                placeholder="Enter your class or section"
+                label="Class/Level"
+                placeholder="Enter your class or level"
                 value={studentClass}
                 onChange={(e) => setStudentClass(e.target.value)}
               />
