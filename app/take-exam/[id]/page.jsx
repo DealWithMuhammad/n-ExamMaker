@@ -9,18 +9,15 @@ import {
   CardHeader,
   Divider,
   Input,
-  Textarea,
-  RadioGroup,
-  Radio,
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  useDisclosure,
 } from "@nextui-org/react";
-import { ArrowLeftIcon, SendIcon } from "lucide-react";
-import {
-  doc,
-  getDoc,
-  addDoc,
-  collection,
-  serverTimestamp,
-} from "firebase/firestore";
+import { AlertTriangle, ExternalLink } from "lucide-react";
+import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import Link from "next/link";
 
@@ -33,12 +30,7 @@ export default function ExamRegistration({ params }) {
   const [studentId, setStudentId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [step, setStep] = useState("registration"); // registration or exam
-
-  // For the exam
-  const [answers, setAnswers] = useState([]);
-  const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [submitting, setSubmitting] = useState(false);
+  const { isOpen, onOpen, onOpenChange } = useDisclosure();
 
   useEffect(() => {
     const fetchExam = async () => {
@@ -47,9 +39,6 @@ export default function ExamRegistration({ params }) {
         if (examDoc.exists()) {
           const examData = { id: examDoc.id, ...examDoc.data() };
           setExam(examData);
-
-          // Initialize answers array
-          setAnswers(examData.questions.map(() => ""));
         } else {
           setError("Exam not found");
         }
@@ -71,86 +60,83 @@ export default function ExamRegistration({ params }) {
     }
 
     setError("");
-    setStep("exam");
+    onOpen();
   };
 
-  const handleAnswerChange = (value) => {
-    const newAnswers = [...answers];
-    newAnswers[currentQuestion] = value;
-    setAnswers(newAnswers);
-  };
+  const openExamWindow = () => {
+    const examData = {
+      exam,
+      studentName,
+      studentClass,
+      studentId,
+    };
 
-  const goToNextQuestion = () => {
-    if (currentQuestion < exam.questions.length - 1) {
-      setCurrentQuestion(currentQuestion + 1);
-    }
-  };
+    // Store exam data in sessionStorage for the new window
+    sessionStorage.setItem("examData", JSON.stringify(examData));
 
-  const goToPreviousQuestion = () => {
-    if (currentQuestion > 0) {
-      setCurrentQuestion(currentQuestion - 1);
-    }
-  };
+    // Open exam in new window
+    const examWindow = window.open(
+      `/take-exam/${id}/exam-window`,
+      "examWindow",
+      "width=1200,height=800,scrollbars=yes,resizable=yes,status=no,toolbar=no,menubar=no,location=no"
+    );
 
-  const submitExam = async () => {
-    try {
-      setSubmitting(true);
+    if (examWindow) {
+      examWindow.focus();
+      onOpenChange();
 
-      const submissionData = {
-        examId: id,
-        examTitle: exam.title,
-        studentName,
-        studentClass,
-        studentId,
-        answers,
-        submittedAt: serverTimestamp(),
-        graded: false,
-      };
-
-      await addDoc(collection(db, "submissions"), submissionData);
-
-      // Redirect to completion page
-      router.push(`/take-exam/complete`);
-    } catch (error) {
-      console.error("Error submitting exam:", error);
-      setError("Failed to submit exam. Please try again.");
-      setSubmitting(false);
+      // Close current window/tab after opening exam window
+      setTimeout(() => {
+        window.close();
+      }, 1000);
+    } else {
+      setError("Please allow popups for this site to take the exam");
     }
   };
 
   if (loading) {
     return (
-      <div className="container mx-auto p-4 text-center">Loading exam...</div>
+      <div className="flex min-h-screen items-center justify-center">
+        <Card className="w-96">
+          <CardBody className="text-center p-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p>Loading exam...</p>
+          </CardBody>
+        </Card>
+      </div>
     );
   }
 
   if (error && !exam) {
     return (
-      <div className="container mx-auto p-4 text-center">
-        <p className="text-danger">{error}</p>
-        <Link href="/take-exam">
-          <Button color="primary" className="mt-4">
-            Go Back
-          </Button>
-        </Link>
+      <div className="flex min-h-screen items-center justify-center">
+        <Card className="w-96">
+          <CardBody className="text-center p-8">
+            <AlertTriangle className="h-12 w-12 text-danger mx-auto mb-4" />
+            <p className="text-danger mb-4">{error}</p>
+            <Link href="/take-exam">
+              <Button color="primary">Go Back</Button>
+            </Link>
+          </CardBody>
+        </Card>
       </div>
     );
   }
 
-  if (step === "registration") {
-    return (
+  return (
+    <>
       <div className="flex min-h-screen flex-col items-center justify-center p-4">
-        <Card className="max-w-md w-full">
+        <Card className="max-w-md w-full shadow-xl">
           <CardHeader className="flex flex-col items-center gap-3">
             <div className="flex flex-col items-center">
-              <h1 className="text-2xl text-center font-bold">{exam.title}</h1>
-              <p className="text-default-500">
+              <h1 className="text-2xl text-center font-bold">{exam?.title}</h1>
+              <p className="text-blue-100">
                 Please enter your information to begin
               </p>
             </div>
           </CardHeader>
           <Divider />
-          <CardBody className="pt-6 pb-8 px-4">
+          <CardBody className="pt-6 pb-8 px-6">
             <div className="space-y-4">
               <Input
                 label="Full Name"
@@ -158,6 +144,11 @@ export default function ExamRegistration({ params }) {
                 value={studentName}
                 onChange={(e) => setStudentName(e.target.value)}
                 isRequired
+                variant="bordered"
+                classNames={{
+                  input: "text-sm",
+                  label: "text-sm font-medium",
+                }}
               />
 
               <Input
@@ -165,6 +156,11 @@ export default function ExamRegistration({ params }) {
                 placeholder="Enter your class or level"
                 value={studentClass}
                 onChange={(e) => setStudentClass(e.target.value)}
+                variant="bordered"
+                classNames={{
+                  input: "text-sm",
+                  label: "text-sm font-medium",
+                }}
               />
 
               <Input
@@ -172,127 +168,98 @@ export default function ExamRegistration({ params }) {
                 placeholder="Enter your student ID if applicable"
                 value={studentId}
                 onChange={(e) => setStudentId(e.target.value)}
+                variant="bordered"
+                classNames={{
+                  input: "text-sm",
+                  label: "text-sm font-medium",
+                }}
               />
 
-              {error && <p className="text-danger text-sm">{error}</p>}
+              {error && (
+                <div className="bg-danger-50 border border-danger-200 rounded-lg p-3">
+                  <p className="text-danger text-sm">{error}</p>
+                </div>
+              )}
 
               <div className="pt-4">
-                <Button color="primary" className="w-full" onClick={startExam}>
+                <Button
+                  color="primary"
+                  className="w-full font-semibold"
+                  size="lg"
+                  onClick={startExam}
+                  endContent={<ExternalLink size={18} />}
+                >
                   Start Exam
                 </Button>
               </div>
 
               <div className="text-center">
-                <Link href="/take-exam" className="text-sm text-primary">
-                  Back
+                <Link
+                  href="/take-exam"
+                  className="text-sm text-primary hover:underline"
+                >
+                  ← Back to Exam List
                 </Link>
               </div>
             </div>
           </CardBody>
         </Card>
       </div>
-    );
-  }
 
-  // Exam taking interface
-  const question = exam.questions[currentQuestion];
-  const isLastQuestion = currentQuestion === exam.questions.length - 1;
-  const isFirstQuestion = currentQuestion === 0;
-  const allQuestionsAnswered = answers.every((answer, index) => {
-    // For MCQ, we need a selected option
-    if (exam.questions[index].type === "mcq") {
-      return answer !== "";
-    }
-    // For long answer, any non-empty string is fine
-    return answer && answer.trim() !== "";
-  });
-
-  return (
-    <div className="container mx-auto p-4 max-w-3xl">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">{exam.title}</h1>
-        <div className="text-sm text-default-500">
-          Question {currentQuestion + 1} of {exam.questions.length}
-        </div>
-      </div>
-
-      <div className="mb-4 overflow-x-auto">
-        <div className="flex gap-1">
-          {exam.questions.map((_, index) => (
-            <Button
-              key={index}
-              size="sm"
-              variant={index === currentQuestion ? "solid" : "flat"}
-              color={answers[index] ? "success" : "default"}
-              onClick={() => setCurrentQuestion(index)}
-              className="min-w-[40px]"
-            >
-              {index + 1}
-            </Button>
-          ))}
-        </div>
-      </div>
-
-      <Card className="mb-6">
-        <CardBody className="p-6">
-          <div className="mb-4">
-            <h2 className="text-xl font-medium mb-2">
-              Question {currentQuestion + 1}
-            </h2>
-            <p className="text-default-700">{question.text}</p>
-          </div>
-
-          <Divider className="my-4" />
-
-          {question.type === "mcq" ? (
-            <RadioGroup
-              value={answers[currentQuestion]?.toString()}
-              onValueChange={(value) =>
-                handleAnswerChange(Number.parseInt(value))
-              }
-            >
-              {question.options.map((option, index) => (
-                <Radio key={index} value={index.toString()}>
-                  {option}
-                </Radio>
-              ))}
-            </RadioGroup>
-          ) : (
-            <Textarea
-              placeholder="Type your answer here..."
-              value={answers[currentQuestion] || ""}
-              onChange={(e) => handleAnswerChange(e.target.value)}
-              minRows={5}
-            />
+      <Modal
+        isOpen={isOpen}
+        onOpenChange={onOpenChange}
+        isDismissable={false}
+        hideCloseButton
+        size="md"
+      >
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader className="flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-warning" />
+                  Important Exam Instructions
+                </div>
+              </ModalHeader>
+              <ModalBody>
+                <div className="space-y-3">
+                  <p className="text-sm">
+                    <strong>⚠️ Security Notice:</strong> The exam will open in a
+                    new window with the following restrictions:
+                  </p>
+                  <ul className="text-sm space-y-1 ml-4 list-disc">
+                    <li>
+                      You cannot minimize or switch away from the exam window
+                    </li>
+                    <li>
+                      If you leave the exam window for more than{" "}
+                      <strong>1 minute</strong>, your exam will be automatically
+                      terminated
+                    </li>
+                    <li>Make sure you have a stable internet connection</li>
+                    <li>Close all unnecessary applications before starting</li>
+                  </ul>
+                  <div className="bg-warning-50 border border-warning-200 rounded-lg p-3 mt-4">
+                    <p className="text-warning-800 text-sm font-medium">
+                      Once you click "Open Exam Window", you cannot return to
+                      this page. Make sure you're ready!
+                    </p>
+                  </div>
+                </div>
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onClose}>
+                  Cancel
+                </Button>
+                <Button color="primary" onPress={openExamWindow}>
+                  Open Exam Window
+                </Button>
+              </ModalFooter>
+            </>
           )}
-        </CardBody>
-      </Card>
-
-      <div className="flex justify-between">
-        <Button
-          variant="flat"
-          startContent={<ArrowLeftIcon size={16} />}
-          onClick={goToPreviousQuestion}
-          isDisabled={isFirstQuestion}
-        >
-          Previous
-        </Button>
-
-        {isLastQuestion ? (
-          <Button
-            color="primary"
-            endContent={<SendIcon size={16} />}
-            onClick={submitExam}
-            isLoading={submitting}
-          >
-            Submit Exam
-          </Button>
-        ) : (
-          <Button color="primary" onClick={goToNextQuestion}>
-            Next Question
-          </Button>
-        )}
-      </div>
-    </div>
+        </ModalContent>
+      </Modal>
+    </>
   );
 }
